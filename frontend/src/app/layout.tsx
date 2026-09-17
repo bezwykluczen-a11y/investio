@@ -60,6 +60,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 Deklaracje zainteresowania nie sa zobowiazaniem finansowym.
               </p>
               <p>
+                <a href="/skargi" className="block sm:inline underline hover:text-gray-700">Złóż skargę</a>
+                <span className="hidden sm:inline"> • </span>
                 <a href="/polityka-prywatnosci" className="underline hover:text-gray-700">
                   Polityka prywatnosci
                 </a>

@@ -184,3 +184,45 @@ export async function deleteProjectImage(projectId: string, imageId: string): Pr
     throw new Error(err.detail || "Nie udalo sie usunac zdjecia");
   }
 }
+
+
+export type ComplaintCreatePayload = {
+  last_name: string;
+  first_name: string;
+  company_name?: string;
+  registration_number?: string;
+  street_address?: string;
+  postal_code?: string;
+  city?: string;
+  country?: string;
+  email: string;
+  phone?: string;
+  rep_last_name?: string;
+  rep_first_name?: string;
+  rep_entity_name?: string;
+  rep_registration_number?: string;
+  rep_street_address?: string;
+  rep_postal_code?: string;
+  rep_city?: string;
+  rep_country?: string;
+  rep_email?: string;
+  rep_phone?: string;
+  project_reference?: string;
+  complaint_description: string;
+  incident_dates?: string;
+  damage_description?: string;
+  additional_remarks?: string;
+};
+
+export async function submitComplaint(payload: ComplaintCreatePayload): Promise<{ id: string; status: string; created_at: string }> {
+  const res = await fetch(`${API_URL}/complaints`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Nie udało się wysłać skargi");
+  }
+  return res.json();
+}
