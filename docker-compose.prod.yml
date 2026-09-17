@@ -1,0 +1,118 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: portal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: portal
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portal"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    expose:
+      - "6379"
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "127.0.0.1:9000:9000"
+    expose:
+      - "9000"
+
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.backend
+    restart: unless-stopped
+    env_file:
+      - backend/.env.production
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8000:8000"
+
+  worker:
+    build:
+      context: .
+      dockerfile: infra/docker/Dockerfile.backend
+    restart: unless-stopped
+    command: celery -A app.worker worker --loglevel=info
+    env_file:
+      - backend/.env.production
+    depends_on:
+      - redis
+      - db
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        NEXT_PUBLIC_API_URL: https://api.xn--spki-niemieckie-wrb75k.pl/api/v1
+        WORDPRESS_API_URL: https://blog.xn--spki-niemieckie-wrb75k.pl/wp-json/wp/v2
+    restart: unless-stopped
+    depends_on:
+      - api
+      - wordpress
+    ports:
+      - "127.0.0.1:3001:3000"
+
+  wordpress-db:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${WORDPRESS_DB_ROOT_PASSWORD}
+    volumes:
+      - wordpress_db_data:/var/lib/mysql
+    expose:
+      - "3306"
+
+  wordpress:
+    image: wordpress:latest
+    restart: unless-stopped
+    environment:
+      WORDPRESS_DB_HOST: wordpress-db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_HOME', 'https://blog.xn--spki-niemieckie-wrb75k.pl');
+        define('WP_SITEURL', 'https://blog.xn--spki-niemieckie-wrb75k.pl');
+        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && $$_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+            $$_SERVER['HTTPS'] = 'on';
+        }
+    depends_on:
+      - wordpress-db
+    volumes:
+      - wordpress_data:/var/www/html
+    ports:
+      - "127.0.0.1:8081:80"
+
+volumes:
+  db_data:
+  minio_data:
+  wordpress_data:
+  wordpress_db_data:
